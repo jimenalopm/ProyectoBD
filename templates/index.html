@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<h2>Estado de la base de datos</h2>
+{% if error %}
+  <div class="alert alert-danger">No se pudo conectar a Oracle: {{ error }}</div>
+{% else %}
+<div class="row g-3 mt-1">
+  <div class="col-md-6"><div class="card"><div class="card-header">Instancia</div>
+    <table class="table mb-0">
+      <tr><th>Nombre</th><td>{{ inst.INSTANCE_NAME }}</td></tr>
+      <tr><th>Host</th><td>{{ inst.HOST_NAME }}</td></tr>
+      <tr><th>Versión</th><td>{{ inst.VERSION_FULL }}</td></tr>
+      <tr><th>Estado</th><td>{{ inst.STATUS }}</td></tr>
+      <tr><th>Inicio</th><td>{{ inst.STARTUP_TIME }}</td></tr>
+    </table></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header">Base de datos</div>
+    <table class="table mb-0">
+      <tr><th>Nombre</th><td>{{ db.NAME }}</td></tr>
+      <tr><th>Contenedor actual</th><td>{{ db.CON_NAME }}</td></tr>
+      <tr><th>Modo de apertura</th><td>{{ db.OPEN_MODE }}</td></tr>
+      <tr><th>Log mode</th><td>{{ db.LOG_MODE }}</td></tr>
+      <tr><th>Datafiles (MB)</th><td>{{ espacio.MB_DATAFILES }}</td></tr>
+    </table></div></div>
+</div>
+{% endif %}
+{% endblock %}
