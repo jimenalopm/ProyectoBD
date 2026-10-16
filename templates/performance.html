@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Performance{% endblock %}
+{% block content %}
+{% if auto %}<meta http-equiv="refresh" content="10">{% endif %}
+<div class="d-flex justify-content-between align-items-center">
+  <h2>Performance de la base de datos</h2>
+  <form method="get" class="d-flex gap-3 align-items-center small">
+    <input type="hidden" name="orden" value="{{ orden }}"><input type="hidden" name="sys" value="{{ '1' if ocultar_sys else '0' }}">
+    <div class="form-check"><input type="checkbox" class="form-check-input" id="auto" name="auto" value="1" {{ 'checked' if auto }} onchange="this.form.submit()"><label for="auto" class="form-check-label">Actualizar cada 10 s</label></div>
+    <button class="btn btn-sm btn-outline-secondary">Refrescar</button>
+  </form>
+</div>
+{% for k, v in errores.items() %}<div class="alert alert-warning py-1 small">Sección «{{ k }}»: {{ v }}</div>{% endfor %}
+
+{% if resumen %}
+<div class="row g-3 my-1">
+  {% for t, v in [('Sesiones de usuario', resumen.SESIONES), ('Sesiones activas', resumen.ACTIVAS), ('Sesiones bloqueadas', resumen.BLOQUEADAS), ('PGA asignada (MB)', resumen.PGA_MB), ('SGA máx. (MB)', resumen.SGA_MB)] %}
+  <div class="col"><div class="card text-center"><div class="card-body py-2"><div class="h3 mb-0 {{ 'text-danger' if t == 'Sesiones bloqueadas' and v }}">{{ v if v is not none else '-' }}</div><div class="small text-muted">{{ t }}</div></div></div></div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-3 mt-1">
+  <div class="col-md-6"><div class="card h-100"><div class="card-header">Métricas del sistema (v$sysmetric)</div>
+    <table class="table table-sm mb-0 small">{% for m in metricas %}<tr><td>{{ m.METRIC_NAME }}</td><td class="text-end"><b>{{ m.VALUE }}</b></td><td class="text-muted">{{ m.UNIT }}</td></tr>
+    {% else %}<tr><td class="text-muted">Sin datos.</td></tr>{% endfor %}</table></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-header">Ratios de eficiencia (%)</div>
+    <table class="table table-sm mb-0 small">{% for r in ratios %}<tr><td>{{ r.NOMBRE }}</td>
+      <td style="width:45%"><div class="progress"><div class="progress-bar {{ 'bg-danger' if r.VALOR is not none and r.VALOR < 80 else 'bg-warning' if r.VALOR is not none and r.VALOR < 95 else 'bg-success' }}" style="width:{{ r.VALOR or 0 }}%">{{ r.VALOR if r.VALOR is not none else '-' }}</div></div></td></tr>
+    {% else %}<tr><td class="text-muted">Sin datos.</td></tr>{% endfor %}</table></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-header">Memoria SGA (MB)</div>
+    <table class="table table-sm mb-0 small">{% for s in sga %}<tr><td>{{ s.NAME }}</td><td class="text-end">{{ s.MB }}</td></tr>{% endfor %}</table></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-header">Memoria PGA (MB)</div>
+    <table class="table table-sm mb-0 small">{% for s in pga %}<tr><td>{{ s.NAME }}</td><td class="text-end">{{ s.MB }}</td></tr>{% endfor %}</table></div></div>
+</div>
+
+<div class="card mt-3"><div class="card-header">Principales esperas (sin Idle)</div>
+<div class="table-responsive"><table class="table table-sm mb-0 small">
+  <thead><tr><th>Evento</th><th>Clase</th><th>Esperas</th><th>Segundos</th><th>ms promedio</th></tr></thead>
+  <tbody>{% for e in esperas %}<tr><td>{{ e.EVENT }}</td><td>{{ e.WAIT_CLASS }}</td><td>{{ e.TOTAL_WAITS }}</td><td>{{ e.SEGUNDOS }}</td><td>{{ e.MS_PROM }}</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center">Top 10 SQL
+  <form method="get" class="d-flex gap-2 small align-items-center">
+    <input type="hidden" name="auto" value="{{ '1' if auto }}">
+    <select name="orden" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for k, n in [('elapsed','Tiempo total'),('cpu','CPU'),('reads','Lecturas de disco'),('gets','Buffer gets'),('execs','Ejecuciones')] %}<option value="{{ k }}" {{ 'selected' if k == orden }}>{{ n }}</option>{% endfor %}</select>
+    <select name="sys" class="form-select form-select-sm" onchange="this.form.submit()"><option value="1" {{ 'selected' if ocultar_sys }}>Ocultar SYS/SYSTEM</option><option value="0" {{ 'selected' if not ocultar_sys }}>Mostrar todo</option></select>
+  </form></div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>SQL_ID</th><th>Usuario</th><th>Exec</th><th>Total ms</th><th>CPU ms</th><th>ms/exec</th><th>Buffer gets</th><th>Disk reads</th><th>Filas</th><th>SQL</th></tr></thead>
+  <tbody>{% for q in topsql %}<tr><td><code>{{ q.SQL_ID }}</code></td><td>{{ q.USUARIO }}</td><td>{{ q.EXECUTIONS }}</td><td>{{ q.ELAPSED_MS }}</td><td>{{ q.CPU_MS }}</td><td>{{ q.MS_POR_EXEC }}</td><td>{{ q.BUFFER_GETS }}</td><td>{{ q.DISK_READS }}</td><td>{{ q.FILAS }}</td><td style="max-width:320px" class="text-truncate" title="{{ q.SQL_TEXT }}">{{ q.SQL_TEXT }}</td></tr>
+  {% else %}<tr><td colspan="10" class="text-muted">Sin sentencias.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="row g-3 mt-1 mb-4">
+  <div class="col-12"><div class="card"><div class="card-header">Sesiones activas</div>
+    <div class="table-responsive"><table class="table table-sm mb-0 small">
+      <thead><tr><th>SID</th><th>Usuario</th><th>Evento</th><th>Clase</th><th>Seg</th><th>SQL_ID</th><th>SQL</th></tr></thead>
+      <tbody>{% for s in activas %}<tr><td>{{ s.SID }},{{ s.SERIAL }}</td><td>{{ s.USERNAME }}</td><td>{{ s.EVENT }}</td><td>{{ s.WAIT_CLASS }}</td><td>{{ s.SEGUNDOS }}</td><td><code>{{ s.SQL_ID or '' }}</code></td><td style="max-width:320px" class="text-truncate">{{ s.SQL_TEXT or '' }}</td></tr>
+      {% else %}<tr><td colspan="7" class="text-muted">Sin sesiones activas.</td></tr>{% endfor %}</tbody></table></div></div></div>
+  <div class="col-12"><div class="card"><div class="card-header">Bloqueos</div>
+    <div class="table-responsive"><table class="table table-sm mb-0 small">
+      <thead><tr><th>Espera (SID)</th><th>Usuario</th><th>Bloqueado por (SID)</th><th>Usuario</th><th>Evento</th><th>Seg</th></tr></thead>
+      <tbody>{% for b in bloqueos %}<tr class="table-danger"><td>{{ b.ESPERA_SID }}</td><td>{{ b.ESPERA_USUARIO }}</td><td>{{ b.BLOQUEA_SID }}</td><td>{{ b.BLOQUEA_USUARIO }}</td><td>{{ b.EVENT }}</td><td>{{ b.SEGUNDOS }}</td></tr>
+      {% else %}<tr><td colspan="6" class="text-muted">Sin bloqueos.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+{% endblock %}
