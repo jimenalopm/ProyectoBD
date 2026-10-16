@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Usuario {{ u }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('usuarios.listar') }}">&larr; Usuarios</a>
+<h2 class="mt-2">Usuario {{ u }}</h2>
+
+<div class="card mb-3"><div class="card-header">Otorgar privilegio de sistema o rol</div><div class="card-body">
+<form method="post" action="{{ url_for('usuarios.otorgar', usuario=u) }}" class="row g-2">
+  <div class="col-md-5"><input name="privilegio" list="roles" class="form-control" placeholder="Ej. CONNECT, RESOURCE, CREATE TABLE" required>
+    <datalist id="roles">{% for r in todos_roles %}<option value="{{ r }}">{% endfor %}<option value="CREATE SESSION"><option value="CREATE TABLE"><option value="CREATE VIEW"><option value="UNLIMITED TABLESPACE"></datalist></div>
+  <div class="col-md-3 form-check ms-2 pt-2"><input type="checkbox" name="admin" class="form-check-input" id="ad"><label for="ad" class="form-check-label">WITH ADMIN OPTION</label></div>
+  <div class="col-md-2"><button class="btn btn-primary">Otorgar</button></div>
+</form></div></div>
+
+<div class="row g-3">
+  <div class="col-md-6"><div class="card"><div class="card-header">Roles</div>
+    <table class="table table-sm mb-0">{% for r in roles %}<tr><td>{{ r.GRANTED_ROLE }}</td><td>{{ 'ADMIN' if r.ADMIN_OPTION == 'YES' else '' }}</td>
+      <td class="text-end"><form method="post" action="{{ url_for('usuarios.revocar', usuario=u) }}"><input type="hidden" name="privilegio" value="{{ r.GRANTED_ROLE }}"><button class="btn btn-sm btn-outline-danger">Revocar</button></form></td></tr>
+      {% else %}<tr><td class="text-muted">Sin roles.</td></tr>{% endfor %}</table></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header">Privilegios de sistema</div>
+    <table class="table table-sm mb-0">{% for p in privs %}<tr><td>{{ p.PRIVILEGE }}</td><td>{{ 'ADMIN' if p.ADMIN_OPTION == 'YES' else '' }}</td>
+      <td class="text-end"><form method="post" action="{{ url_for('usuarios.revocar', usuario=u) }}"><input type="hidden" name="privilegio" value="{{ p.PRIVILEGE }}"><button class="btn btn-sm btn-outline-danger">Revocar</button></form></td></tr>
+      {% else %}<tr><td class="text-muted">Sin privilegios.</td></tr>{% endfor %}</table></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header">Cuotas</div>
+    <table class="table table-sm mb-0"><tr><th>Tablespace</th><th>Usado MB</th><th>Máx MB</th></tr>
+      {% for q in quotas %}<tr><td>{{ q.TABLESPACE_NAME }}</td><td>{{ q.USADO_MB }}</td><td>{{ q.MAX_MB }}</td></tr>
+      {% else %}<tr><td colspan="3" class="text-muted">Sin cuotas.</td></tr>{% endfor %}</table>
+    <div class="card-body border-top"><form method="post" action="{{ url_for('usuarios.quota') }}" class="row g-2">
+      <input type="hidden" name="usuario" value="{{ u }}">
+      <div class="col-5"><select name="tablespace" class="form-select form-select-sm">{% for t in tbs %}<option>{{ t }}</option>{% endfor %}</select></div>
+      <div class="col-4"><input name="quota" class="form-control form-control-sm" placeholder="100M / UNLIMITED" required></div>
+      <div class="col-3"><button class="btn btn-sm btn-primary">Asignar</button></div></form></div></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header">Privilegios sobre objetos</div>
+    <table class="table table-sm mb-0">{% for o in objs %}<tr><td>{{ o.PRIVILEGE }}</td><td>{{ o.OWNER }}.{{ o.TABLE_NAME }}</td></tr>
+      {% else %}<tr><td class="text-muted">Sin privilegios sobre objetos.</td></tr>{% endfor %}</table></div></div>
+</div>
+{% endblock %}

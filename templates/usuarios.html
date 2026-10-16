@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+<h2>Seguridad de usuarios</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link active" href="{{ url_for('usuarios.listar') }}">Usuarios</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.perfiles') }}">Perfiles</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.sesiones') }}">Sesiones</a></li>
+</ul>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="card mb-4"><div class="card-header">Crear usuario</div><div class="card-body">
+<form method="post" action="{{ url_for('usuarios.crear') }}" class="row g-2">
+  <div class="col-md-3"><input name="usuario" class="form-control" placeholder="Usuario" required></div>
+  <div class="col-md-3"><input name="password" type="password" class="form-control" placeholder="Contraseña" required></div>
+  <div class="col-md-2"><select name="tablespace" class="form-select"><option value="">Tablespace por defecto</option>{% for t in tbs %}<option>{{ t }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select name="temporal" class="form-select"><option value="">Temporal</option>{% for t in temps %}<option>{{ t }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select name="perfil" class="form-select"><option value="">Perfil</option>{% for p in perfiles %}<option>{{ p }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><input name="quota" class="form-control" placeholder="Cuota (50M)"></div>
+  <div class="col-md-3 form-check ms-2 pt-2"><input type="checkbox" name="conectar" class="form-check-input" id="cs" checked><label for="cs" class="form-check-label">Otorgar CREATE SESSION</label></div>
+  <div class="col-12"><button class="btn btn-primary">Crear usuario</button></div>
+</form></div></div>
+
+<div class="card"><div class="card-header">Usuarios (no mantenidos por Oracle)</div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
+  <thead><tr><th>Usuario</th><th>Estado</th><th>Tablespace</th><th>Temp</th><th>Perfil</th><th>Creado</th><th>Acciones</th></tr></thead>
+  <tbody>
+  {% for u in usuarios %}
+  <tr>
+    <td><a href="{{ url_for('usuarios.detalle', usuario=u.USERNAME) }}"><b>{{ u.USERNAME }}</b></a></td>
+    <td><span class="badge {{ 'bg-success' if u.ACCOUNT_STATUS == 'OPEN' else 'bg-danger' if 'LOCKED' in u.ACCOUNT_STATUS else 'bg-warning text-dark' }}">{{ u.ACCOUNT_STATUS }}</span></td>
+    <td>{{ u.DEFAULT_TABLESPACE }}</td><td>{{ u.TEMPORARY_TABLESPACE }}</td><td>{{ u.PROFILE }}</td><td>{{ u.CREATED }}</td>
+    <td class="text-nowrap">
+      <form method="post" action="{{ url_for('usuarios.bloqueo') }}" class="d-inline">
+        <input type="hidden" name="usuario" value="{{ u.USERNAME }}">
+        {% if 'LOCKED' in u.ACCOUNT_STATUS %}<button name="modo" value="unlock" class="btn btn-sm btn-outline-success">Desbloquear</button>
+        {% else %}<button name="modo" value="lock" class="btn btn-sm btn-outline-secondary">Bloquear</button>{% endif %}
+      </form>
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#pwdModal" data-u="{{ u.USERNAME }}">Contraseña</button>
+      <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#dropModal" data-u="{{ u.USERNAME }}">Eliminar</button>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="text-muted">Sin usuarios.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+<div class="modal fade" id="pwdModal" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('usuarios.password') }}" class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Cambiar contraseña de <span id="pwdName"></span></h5></div>
+  <div class="modal-body"><input type="hidden" name="usuario" id="pwdU"><input name="password" type="password" class="form-control" placeholder="Nueva contraseña" required></div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary">Guardar</button></div>
+</form></div></div>
+
+<div class="modal fade" id="dropModal" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('usuarios.eliminar') }}" class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Eliminar usuario</h5></div>
+  <div class="modal-body"><p>Se eliminará el usuario y todos sus objetos (CASCADE). Escriba <b id="dropName"></b> para confirmar.</p>
+    <input type="hidden" name="usuario" id="dropU"><input name="confirmar" class="form-control" required></div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-danger">Eliminar</button></div>
+</form></div></div>
+<script>
+function wire(modal, spanId, inputId){
+  document.getElementById(modal).addEventListener('show.bs.modal', e => {
+    const u = e.relatedTarget.dataset.u;
+    document.getElementById(spanId).textContent = u;
+    document.getElementById(inputId).value = u;
+  });
+}
+wire('pwdModal','pwdName','pwdU'); wire('dropModal','dropName','dropU');
+</script>
+{% endblock %}

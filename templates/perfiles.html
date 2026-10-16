@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Perfiles{% endblock %}
+{% block content %}
+<h2>Seguridad de usuarios</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.listar') }}">Usuarios</a></li>
+  <li class="nav-item"><a class="nav-link active" href="{{ url_for('usuarios.perfiles') }}">Perfiles</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.sesiones') }}">Sesiones</a></li>
+</ul>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-5"><div class="card"><div class="card-header">Crear perfil</div><div class="card-body">
+    <form method="post" action="{{ url_for('usuarios.perfil_crear') }}" class="d-flex gap-2">
+      <input name="perfil" class="form-control" placeholder="Nombre del perfil" required><button class="btn btn-primary">Crear</button></form></div></div></div>
+  <div class="col-md-7"><div class="card"><div class="card-header">Modificar límite</div><div class="card-body">
+    <form method="post" action="{{ url_for('usuarios.perfil_limite') }}" class="row g-2">
+      <div class="col-4"><select name="perfil" class="form-select">{% for p in datos %}<option>{{ p }}</option>{% endfor %}</select></div>
+      <div class="col-4"><select name="recurso" class="form-select">{% for l in limites %}<option>{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-2"><input name="valor" class="form-control" placeholder="Valor" required></div>
+      <div class="col-2"><button class="btn btn-primary">Aplicar</button></div>
+    </form></div></div></div>
+</div>
+
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Perfil</th>{% for l in limites %}<th>{{ l }}</th>{% endfor %}<th></th></tr></thead>
+  <tbody>{% for p, v in datos.items() %}<tr><td><b>{{ p }}</b></td>
+    {% for l in limites %}<td>{{ v.get(l, '') }}</td>{% endfor %}
+    <td>{% if p != 'DEFAULT' %}<form method="post" action="{{ url_for('usuarios.perfil_eliminar') }}" onsubmit="return confirm('¿Eliminar el perfil {{ p }}?')"><input type="hidden" name="perfil" value="{{ p }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

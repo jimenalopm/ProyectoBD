@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sesiones{% endblock %}
+{% block content %}
+<h2>Seguridad de usuarios</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.listar') }}">Usuarios</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('usuarios.perfiles') }}">Perfiles</a></li>
+  <li class="nav-item"><a class="nav-link active" href="{{ url_for('usuarios.sesiones') }}">Sesiones</a></li>
+</ul>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small align-middle">
+  <thead><tr><th>SID</th><th>Serial</th><th>Usuario</th><th>Estado</th><th>OS user</th><th>Máquina</th><th>Programa</th><th>Conexión</th><th></th></tr></thead>
+  <tbody>{% for s in sesiones %}<tr>
+    <td>{{ s.SID }}</td><td>{{ s.SERIAL }}</td><td><b>{{ s.USERNAME }}</b></td><td>{{ s.STATUS }}</td>
+    <td>{{ s.OSUSER }}</td><td>{{ s.MACHINE }}</td><td>{{ s.PROGRAM }}</td><td>{{ s.LOGON_TIME }}</td>
+    <td><form method="post" action="{{ url_for('usuarios.matar') }}" onsubmit="return confirm('¿Terminar la sesión {{ s.SID }},{{ s.SERIAL }}?')">
+      <input type="hidden" name="sid" value="{{ s.SID }}"><input type="hidden" name="serial" value="{{ s.SERIAL }}">
+      <button class="btn btn-sm btn-outline-danger">Terminar</button></form></td>
+  </tr>{% else %}<tr><td colspan="9" class="text-muted">Sin sesiones de usuario.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}
