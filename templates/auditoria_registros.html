@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Registros de auditoría{% endblock %}
+{% block content %}
+<h2>Auditoría de la base de datos</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('auditoria.politicas') }}">Políticas</a></li>
+  <li class="nav-item"><a class="nav-link active" href="{{ url_for('auditoria.registros') }}">Registros</a></li>
+</ul>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-2"><input name="usuario" value="{{ f.usuario }}" class="form-control" placeholder="Usuario"></div>
+  <div class="col-md-2"><input name="accion" value="{{ f.accion }}" list="acc" class="form-control" placeholder="Acción">
+    <datalist id="acc">{% for a in acciones %}<option value="{{ a }}">{% endfor %}</datalist></div>
+  <div class="col-md-2"><input type="date" name="desde" value="{{ f.desde }}" class="form-control"></div>
+  <div class="col-md-2"><input type="date" name="hasta" value="{{ f.hasta }}" class="form-control"></div>
+  <div class="col-md-1"><select name="resultado" class="form-select">
+    <option value="">Todos</option><option value="ok" {{ 'selected' if f.resultado=='ok' }}>OK</option><option value="error" {{ 'selected' if f.resultado=='error' }}>Error</option></select></div>
+  <div class="col-md-1"><input type="number" name="limite" value="{{ f.limite }}" class="form-control" title="Máx. filas"></div>
+  <div class="col-md-2"><button class="btn btn-primary">Filtrar</button>
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#limpiarModal">Limpiar</button></div>
+</form>
+
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small">
+  <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Código</th><th>Políticas</th><th>SQL</th></tr></thead>
+  <tbody>{% for r in filas %}<tr>
+    <td class="text-nowrap">{{ r.FECHA }}</td><td>{{ r.DBUSERNAME }}</td><td>{{ r.ACTION_NAME }}</td>
+    <td>{% if r.OBJECT_NAME %}{{ r.OBJECT_SCHEMA }}.{{ r.OBJECT_NAME }}{% endif %}</td>
+    <td>{% if r.RETURN_CODE == 0 %}<span class="badge bg-success">0</span>{% else %}<span class="badge bg-danger">{{ r.RETURN_CODE }}</span>{% endif %}</td>
+    <td>{{ r.POLITICAS or '' }}</td><td style="max-width:320px" class="text-truncate" title="{{ r.SQL_TEXT or '' }}">{{ r.SQL_TEXT or '' }}</td>
+  </tr>{% else %}<tr><td colspan="7" class="text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="modal fade" id="limpiarModal" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('auditoria.limpiar') }}" class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Limpiar registros de auditoría</h5></div>
+  <div class="modal-body"><p>Se eliminarán todos los registros del trail unificado. Escriba <b>LIMPIAR</b> para confirmar.</p><input name="confirmar" class="form-control" required></div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-danger">Limpiar</button></div>
+</form></div></div>
+{% endblock %}

@@ -11,12 +11,16 @@ from modules.tablespaces import bp as tablespaces_bp  # noqa: E402
 from modules.usuarios import bp as usuarios_bp  # noqa: E402
 
 app.register_blueprint(tablespaces_bp)
+from modules.auditoria import bp as auditoria_bp  # noqa: E402
+
 app.register_blueprint(usuarios_bp)
+app.register_blueprint(auditoria_bp)
 
 MODULOS = [
     ("index", "Inicio"),
     ("tablespaces.listar", "Tablespaces"),
     ("usuarios.listar", "Seguridad de usuarios"),
+    ("auditoria.politicas", "Auditoría"),
 ]
 
 

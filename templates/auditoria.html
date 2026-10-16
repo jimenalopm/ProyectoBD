@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Auditoría{% endblock %}
+{% block content %}
+<h2>Auditoría de la base de datos</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link active" href="{{ url_for('auditoria.politicas') }}">Políticas</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('auditoria.registros') }}">Registros</a></li>
+</ul>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if info %}
+<div class="alert alert-secondary py-2">
+  Auditoría unificada: <b>{{ 'Activa' if info.unificada else 'No activa' }}</b> ·
+  audit_trail: <b>{{ info.audit_trail }}</b> · Registros en el trail: <b>{{ info.registros }}</b>
+</div>
+{% endif %}
+
+<div class="card mb-4"><div class="card-header">Crear política de auditoría</div><div class="card-body">
+<form method="post" action="{{ url_for('auditoria.crear') }}" class="row g-2">
+  <div class="col-md-4"><input name="nombre" class="form-control" placeholder="Nombre de la política" required></div>
+  <div class="col-md-4"><select name="usuario" class="form-select"><option value="">Todos los usuarios</option>{% for u in usuarios %}<option>{{ u }}</option>{% endfor %}</select></div>
+  <div class="col-md-4 form-check pt-2 ps-5"><input type="checkbox" name="habilitar" class="form-check-input" id="hab" checked><label for="hab" class="form-check-label">Habilitar al crear</label></div>
+  <div class="col-md-7"><label class="form-label small mb-1">Acciones de sistema</label><div class="row">
+    {% for a in sistema %}<div class="col-6 col-lg-4 form-check"><input type="checkbox" name="sistema" value="{{ a }}" class="form-check-input" id="s{{ loop.index }}"><label class="form-check-label small" for="s{{ loop.index }}">{{ a }}</label></div>{% endfor %}
+  </div></div>
+  <div class="col-md-5"><label class="form-label small mb-1">Acciones sobre un objeto</label><div class="row">
+    {% for a in objeto %}<div class="col-6 form-check"><input type="checkbox" name="objeto" value="{{ a }}" class="form-check-input" id="o{{ loop.index }}"><label class="form-check-label small" for="o{{ loop.index }}">{{ a }}</label></div>{% endfor %}
+  </div><input name="objeto_nombre" class="form-control form-control-sm mt-2" placeholder="ESQUEMA.OBJETO"></div>
+  <div class="col-12"><button class="btn btn-primary">Crear política</button></div>
+</form></div></div>
+
+<div class="card"><div class="card-header">Políticas</div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle small">
+  <thead><tr><th>Política</th><th>Acciones</th><th>Detalle</th><th>Habilitada para</th><th></th></tr></thead>
+  <tbody>
+  {% for p in pols %}<tr>
+    <td><b>{{ p.POLICY_NAME }}</b></td><td>{{ p.ACCIONES }}</td><td style="max-width:360px">{{ p.DETALLE }}{% if p.OBJETO %} · {{ p.OBJETO }}{% endif %}</td>
+    <td>{% if p.HABILITADA %}<span class="badge bg-success">{{ p.HABILITADA }}</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+    <td class="text-nowrap">
+      {% if p.HABILITADA %}
+      <form method="post" action="{{ url_for('auditoria.deshabilitar') }}" class="d-inline"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-secondary">Deshabilitar</button></form>
+      {% else %}
+      <form method="post" action="{{ url_for('auditoria.habilitar') }}" class="d-inline"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-success">Habilitar</button></form>
+      {% endif %}
+      {% if not p.POLICY_NAME.startswith('ORA_') %}
+      <form method="post" action="{{ url_for('auditoria.eliminar') }}" class="d-inline" onsubmit="return confirm('¿Eliminar la política {{ p.POLICY_NAME }}?')"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>
+      {% endif %}
+    </td></tr>
+  {% else %}<tr><td colspan="5" class="text-muted">Sin políticas.</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}
