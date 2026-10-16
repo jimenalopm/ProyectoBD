@@ -26,7 +26,7 @@
   <thead><tr><th>Perfil</th>{% for l in limites %}<th>{{ l }}</th>{% endfor %}<th></th></tr></thead>
   <tbody>{% for p, v in datos.items() %}<tr><td><b>{{ p }}</b></td>
     {% for l in limites %}<td>{{ v.get(l, '') }}</td>{% endfor %}
-    <td>{% if p != 'DEFAULT' %}<form method="post" action="{{ url_for('usuarios.perfil_eliminar') }}" onsubmit="return confirm('¿Eliminar el perfil {{ p }}?')"><input type="hidden" name="perfil" value="{{ p }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>{% endif %}</td></tr>
+    <td>{% if p != 'DEFAULT' %}<form method="post" action="{{ url_for('usuarios.perfil_eliminar') }}" data-confirm="¿Eliminar el perfil {{ p }}?"><input type="hidden" name="perfil" value="{{ p }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>{% endif %}</td></tr>
   {% endfor %}</tbody>
 </table></div></div>
 {% endblock %}

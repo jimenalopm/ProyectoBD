@@ -14,11 +14,18 @@
 
 {% if resumen %}
 <div class="row g-3 my-1">
-  {% for t, v in [('Sesiones de usuario', resumen.SESIONES), ('Sesiones activas', resumen.ACTIVAS), ('Sesiones bloqueadas', resumen.BLOQUEADAS), ('PGA asignada (MB)', resumen.PGA_MB), ('SGA máx. (MB)', resumen.SGA_MB)] %}
-  <div class="col"><div class="card text-center"><div class="card-body py-2"><div class="h3 mb-0 {{ 'text-danger' if t == 'Sesiones bloqueadas' and v }}">{{ v if v is not none else '-' }}</div><div class="small text-muted">{{ t }}</div></div></div></div>
+  {% for t, v, ico, grad in [('Sesiones de usuario', resumen.SESIONES, 'bi-people', 'bg-grad-blue'), ('Sesiones activas', resumen.ACTIVAS, 'bi-lightning-charge', 'bg-grad-green'), ('Sesiones bloqueadas', resumen.BLOQUEADAS, 'bi-lock', 'bg-grad-red'), ('PGA asignada (MB)', resumen.PGA_MB, 'bi-memory', 'bg-grad-amber'), ('SGA máx. (MB)', resumen.SGA_MB, 'bi-cpu', 'bg-grad-violet')] %}
+  <div class="col-sm-6 col-xl"><div class="card stat"><div class="stat-icon {{ grad }}"><i class="bi {{ ico }}"></i></div>
+    <div><div class="stat-value {{ 'text-danger' if t == 'Sesiones bloqueadas' and v }}">{{ v if v is not none else '-' }}</div><div class="stat-label">{{ t }}</div></div></div></div>
   {% endfor %}
 </div>
 {% endif %}
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-4"><div class="card"><div class="card-header"><i class="bi bi-speedometer me-2"></i>Ratios de eficiencia (%)</div><div class="chart-box"><canvas id="cRatios"></canvas></div></div></div>
+  <div class="col-lg-4"><div class="card"><div class="card-header"><i class="bi bi-pie-chart me-2"></i>Memoria SGA (MB)</div><div class="chart-box"><canvas id="cSga"></canvas></div></div></div>
+  <div class="col-lg-4"><div class="card"><div class="card-header"><i class="bi bi-hourglass-split me-2"></i>Principales esperas (segundos)</div><div class="chart-box"><canvas id="cEsperas"></canvas></div></div></div>
+</div>
 
 <div class="row g-3 mt-1">
   <div class="col-md-6"><div class="card h-100"><div class="card-header">Métricas del sistema (v$sysmetric)</div>
@@ -65,4 +72,40 @@
       <tbody>{% for b in bloqueos %}<tr class="table-danger"><td>{{ b.ESPERA_SID }}</td><td>{{ b.ESPERA_USUARIO }}</td><td>{{ b.BLOQUEA_SID }}</td><td>{{ b.BLOQUEA_USUARIO }}</td><td>{{ b.EVENT }}</td><td>{{ b.SEGUNDOS }}</td></tr>
       {% else %}<tr><td colspan="6" class="text-muted">Sin bloqueos.</td></tr>{% endfor %}</tbody></table></div></div></div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const ratios = {{ ratios | tojson }}, sga = {{ sga | tojson }}, esperas = {{ esperas | tojson }};
+const charts = [];
+function dibujar() {
+  charts.splice(0).forEach(c => c.destroy());
+  const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  Chart.defaults.color = dark ? '#c9d3ea' : '#44506b';
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  const rejilla = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+  const paleta = ['#c74634', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'];
+  const color = v => v == null ? '#94a3b8' : v < 80 ? '#ef4444' : v < 95 ? '#f59e0b' : '#10b981';
+  charts.push(new Chart(document.getElementById('cRatios'), {
+    type: 'bar',
+    data: { labels: ratios.map(r => r.NOMBRE), datasets: [{ data: ratios.map(r => r.VALOR), backgroundColor: ratios.map(r => color(r.VALOR)), borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { min: 0, max: 100, grid: { color: rejilla } }, y: { grid: { display: false } } } }
+  }));
+  const sgaF = sga.filter(s => s.NAME !== 'Maximum SGA Size');
+  charts.push(new Chart(document.getElementById('cSga'), {
+    type: 'doughnut',
+    data: { labels: sgaF.map(s => s.NAME), datasets: [{ data: sgaF.map(s => s.MB), backgroundColor: paleta, borderWidth: 0 }] },
+    options: { maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+  }));
+  charts.push(new Chart(document.getElementById('cEsperas'), {
+    type: 'bar',
+    data: { labels: esperas.map(e => e.EVENT), datasets: [{ data: esperas.map(e => e.SEGUNDOS), backgroundColor: '#c74634', borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: rejilla } }, y: { grid: { display: false }, ticks: { font: { size: 10 }, callback: function (v) { const t = this.getLabelForValue(v); return t.length > 22 ? t.slice(0, 22) + '…' : t; } } } } }
+  }));
+}
+dibujar(); document.addEventListener('tema-cambiado', dibujar);
+</script>
 {% endblock %}

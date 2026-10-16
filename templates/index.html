@@ -1,27 +1,82 @@
 {% extends "base.html" %}
 {% block title %}Inicio{% endblock %}
 {% block content %}
-<h2>Estado de la base de datos</h2>
+<h2>Panel de control</h2>
 {% if error %}
-  <div class="alert alert-danger">No se pudo conectar a Oracle: {{ error }}</div>
+  <div class="alert alert-danger"><i class="bi bi-plug-fill me-2"></i>No se pudo conectar a Oracle: {{ error }}</div>
 {% else %}
-<div class="row g-3 mt-1">
-  <div class="col-md-6"><div class="card"><div class="card-header">Instancia</div>
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3"><div class="card stat"><div class="stat-icon bg-grad-red"><i class="bi bi-hdd-stack"></i></div>
+    <div><div class="stat-value">{{ resumen.TABLESPACES }}</div><div class="stat-label">Tablespaces</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card stat"><div class="stat-icon bg-grad-blue"><i class="bi bi-people"></i></div>
+    <div><div class="stat-value">{{ resumen.USUARIOS }}</div><div class="stat-label">Usuarios</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card stat"><div class="stat-icon bg-grad-green"><i class="bi bi-activity"></i></div>
+    <div><div class="stat-value">{{ resumen.SESIONES }}</div><div class="stat-label">Sesiones de usuario</div></div></div></div>
+  <div class="col-sm-6 col-xl-3"><div class="card stat"><div class="stat-icon bg-grad-violet"><i class="bi bi-cloud-check"></i></div>
+    <div>{% if resumen.ULTIMO_RESPALDO %}
+      <div class="stat-value fs-5">{{ resumen.ULTIMO_RESPALDO.INICIO }}</div>
+      <div class="stat-label">Último respaldo · {{ resumen.ULTIMO_RESPALDO.TIPO }} · {{ resumen.ULTIMO_RESPALDO.ESTADO }}</div>
+      {% else %}<div class="stat-value fs-5">Sin respaldos</div><div class="stat-label">Cree el primero en Respaldos</div>{% endif %}</div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8"><div class="card"><div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Uso de espacio por tablespace (MB)</div>
+    <div class="chart-box"><canvas id="chartBarras"></canvas></div></div></div>
+  <div class="col-lg-4"><div class="card"><div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Espacio total</div>
+    <div class="chart-box"><canvas id="chartDona"></canvas></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6"><div class="card"><div class="card-header"><i class="bi bi-cpu me-2"></i>Instancia</div>
     <table class="table mb-0">
       <tr><th>Nombre</th><td>{{ inst.INSTANCE_NAME }}</td></tr>
       <tr><th>Host</th><td>{{ inst.HOST_NAME }}</td></tr>
       <tr><th>Versión</th><td>{{ inst.VERSION_FULL }}</td></tr>
-      <tr><th>Estado</th><td>{{ inst.STATUS }}</td></tr>
+      <tr><th>Estado</th><td><span class="badge bg-success">{{ inst.STATUS }}</span></td></tr>
       <tr><th>Inicio</th><td>{{ inst.STARTUP_TIME }}</td></tr>
     </table></div></div>
-  <div class="col-md-6"><div class="card"><div class="card-header">Base de datos</div>
+  <div class="col-md-6"><div class="card"><div class="card-header"><i class="bi bi-database me-2"></i>Base de datos</div>
     <table class="table mb-0">
       <tr><th>Nombre</th><td>{{ db.NAME }}</td></tr>
       <tr><th>Contenedor actual</th><td>{{ db.CON_NAME }}</td></tr>
-      <tr><th>Modo de apertura</th><td>{{ db.OPEN_MODE }}</td></tr>
+      <tr><th>Modo de apertura</th><td><span class="badge bg-success">{{ db.OPEN_MODE }}</span></td></tr>
       <tr><th>Log mode</th><td>{{ db.LOG_MODE }}</td></tr>
       <tr><th>Datafiles (MB)</th><td>{{ espacio.MB_DATAFILES }}</td></tr>
     </table></div></div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not error %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const datos = {{ grafica | tojson }};
+let barras, dona;
+function colores() {
+  const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  return { texto: dark ? '#c9d3ea' : '#44506b', rejilla: dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)' };
+}
+function dibujar() {
+  const c = colores();
+  Chart.defaults.color = c.texto; Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  if (barras) barras.destroy(); if (dona) dona.destroy();
+  barras = new Chart(document.getElementById('chartBarras'), {
+    type: 'bar',
+    data: { labels: datos.map(d => d.NOMBRE),
+      datasets: [{ label: 'Usado', data: datos.map(d => d.USADO), backgroundColor: '#c74634', borderRadius: 6 },
+                 { label: 'Libre', data: datos.map(d => d.LIBRE), backgroundColor: '#3b82f6', borderRadius: 6 }] },
+    options: { maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: c.rejilla } } },
+      plugins: { legend: { position: 'bottom' } } }
+  });
+  const usado = datos.reduce((a, d) => a + d.USADO, 0), libre = datos.reduce((a, d) => a + d.LIBRE, 0);
+  dona = new Chart(document.getElementById('chartDona'), {
+    type: 'doughnut',
+    data: { labels: ['Usado', 'Libre'], datasets: [{ data: [Math.round(usado), Math.round(libre)], backgroundColor: ['#c74634', '#3b82f6'], borderWidth: 0 }] },
+    options: { maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' } } }
+  });
+}
+dibujar(); document.addEventListener('tema-cambiado', dibujar);
+</script>
 {% endif %}
 {% endblock %}

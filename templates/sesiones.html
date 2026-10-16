@@ -13,7 +13,7 @@
   <tbody>{% for s in sesiones %}<tr>
     <td>{{ s.SID }}</td><td>{{ s.SERIAL }}</td><td><b>{{ s.USERNAME }}</b></td><td>{{ s.STATUS }}</td>
     <td>{{ s.OSUSER }}</td><td>{{ s.MACHINE }}</td><td>{{ s.PROGRAM }}</td><td>{{ s.LOGON_TIME }}</td>
-    <td><form method="post" action="{{ url_for('usuarios.matar') }}" onsubmit="return confirm('¿Terminar la sesión {{ s.SID }},{{ s.SERIAL }}?')">
+    <td><form method="post" action="{{ url_for('usuarios.matar') }}" data-confirm="¿Terminar la sesión {{ s.SID }},{{ s.SERIAL }}?">
       <input type="hidden" name="sid" value="{{ s.SID }}"><input type="hidden" name="serial" value="{{ s.SERIAL }}">
       <button class="btn btn-sm btn-outline-danger">Terminar</button></form></td>
   </tr>{% else %}<tr><td colspan="9" class="text-muted">Sin sesiones de usuario.</td></tr>{% endfor %}</tbody>

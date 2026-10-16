@@ -42,7 +42,7 @@
       <form method="post" action="{{ url_for('auditoria.habilitar') }}" class="d-inline"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-success">Habilitar</button></form>
       {% endif %}
       {% if not p.POLICY_NAME.startswith('ORA_') %}
-      <form method="post" action="{{ url_for('auditoria.eliminar') }}" class="d-inline" onsubmit="return confirm('¿Eliminar la política {{ p.POLICY_NAME }}?')"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>
+      <form method="post" action="{{ url_for('auditoria.eliminar') }}" class="d-inline" data-confirm="¿Eliminar la política {{ p.POLICY_NAME }}?"><input type="hidden" name="politica" value="{{ p.POLICY_NAME }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>
       {% endif %}
     </td></tr>
   {% else %}<tr><td colspan="5" class="text-muted">Sin políticas.</td></tr>{% endfor %}

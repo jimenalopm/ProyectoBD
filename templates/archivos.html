@@ -16,7 +16,7 @@
     {% if dias %}
       <div class="small mb-2">{{ candidatos|length }} archivo(s) con {{ dias }} día(s) o más.</div>
       {% if candidatos %}
-      <form method="post" action="{{ url_for('archivos.retencion') }}" onsubmit="return confirm('¿Eliminar {{ candidatos|length }} archivo(s)?')">
+      <form method="post" action="{{ url_for('archivos.retencion') }}" data-confirm="¿Eliminar {{ candidatos|length }} archivo(s)?">
         <input type="hidden" name="dias" value="{{ dias }}"><button class="btn btn-danger btn-sm">Eliminar antiguos</button></form>
       {% endif %}
     {% endif %}
@@ -42,7 +42,7 @@
   <thead><tr><th>Nombre</th><th>Ruta</th><th></th></tr></thead>
   <tbody>{% for d in dirs %}<tr><td>{{ d.DIRECTORY_NAME }}</td><td>{{ d.DIRECTORY_PATH }}</td>
     <td>{% if d.SISTEMA == 'N' and d.DIRECTORY_NAME not in protegidos %}
-      <form method="post" action="{{ url_for('archivos.dir_eliminar') }}" onsubmit="return confirm('¿Eliminar el directorio {{ d.DIRECTORY_NAME }}?')"><input type="hidden" name="nombre" value="{{ d.DIRECTORY_NAME }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>
+      <form method="post" action="{{ url_for('archivos.dir_eliminar') }}" data-confirm="¿Eliminar el directorio {{ d.DIRECTORY_NAME }}?"><input type="hidden" name="nombre" value="{{ d.DIRECTORY_NAME }}"><button class="btn btn-sm btn-outline-danger">Eliminar</button></form>
     {% else %}<span class="text-muted">{{ 'en uso por la app' if d.DIRECTORY_NAME in protegidos else 'sistema' }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
 </table></div>
 <div class="card-body border-top"><form method="post" action="{{ url_for('archivos.dir_crear') }}" class="row g-2">

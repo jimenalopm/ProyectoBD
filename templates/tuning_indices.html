@@ -27,7 +27,7 @@
     <td class="text-nowrap"><form method="post" action="{{ url_for('tuning.indices_accion') }}" class="d-inline">
       <input type="hidden" name="esquema" value="{{ esquema }}"><input type="hidden" name="indice" value="{{ i.INDEX_NAME }}">
       <button name="accion" value="reconstruir" class="btn btn-sm btn-outline-secondary">Rebuild</button>
-      {% if not i.ES_RESTRICCION %}<button name="accion" value="eliminar" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar el índice {{ i.INDEX_NAME }}?')">Eliminar</button>{% endif %}</form></td>
+      {% if not i.ES_RESTRICCION %}<button name="accion" value="eliminar" class="btn btn-sm btn-outline-danger" data-confirm="¿Eliminar el índice {{ i.INDEX_NAME }}?">Eliminar</button>{% endif %}</form></td>
   </tr>{% else %}<tr><td colspan="10" class="text-muted">Sin índices.</td></tr>{% endfor %}</tbody>
 </table></div></div>
 {% endif %}

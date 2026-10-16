@@ -7,7 +7,7 @@
 {% if not ruta and not error %}<div class="alert alert-warning">Primero configure el directorio en <a href="{{ url_for('respaldos.index') }}">Respaldos</a>.</div>{% endif %}
 
 <div class="card mb-4"><div class="card-header">Restaurar</div><div class="card-body">
-<form method="post" action="{{ url_for('recuperacion.restaurar') }}" class="row g-3" id="form">
+<form method="post" action="{{ url_for('recuperacion.restaurar') }}" class="row g-3" id="form" data-confirm="¿Iniciar la recuperación? Puede modificar datos existentes.">
   <div class="col-md-6"><label class="form-label">Archivo de respaldo</label>
     <select name="archivo" id="archivo" class="form-select" required>
       <option value="">-- elegir --</option>
@@ -60,8 +60,5 @@ function sugerir(){
   ver();
 }
 modo.addEventListener('change', ver); archivo.addEventListener('change', sugerir); ver();
-document.getElementById('form').addEventListener('submit', e => {
-  if (!confirm('¿Iniciar la recuperación? Puede modificar datos existentes.')) e.preventDefault();
-});
 </script>
 {% endblock %}
