@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Recuperación{% endblock %}
+{% block content %}
+{% if en_curso %}<meta http-equiv="refresh" content="5">{% endif %}
+<h2>Recuperación de respaldos</h2>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if not ruta and not error %}<div class="alert alert-warning">Primero configure el directorio en <a href="{{ url_for('respaldos.index') }}">Respaldos</a>.</div>{% endif %}
+
+<div class="card mb-4"><div class="card-header">Restaurar</div><div class="card-body">
+<form method="post" action="{{ url_for('recuperacion.restaurar') }}" class="row g-3" id="form">
+  <div class="col-md-6"><label class="form-label">Archivo de respaldo</label>
+    <select name="archivo" id="archivo" class="form-select" required>
+      <option value="">-- elegir --</option>
+      {% for d in dumps %}<option value="{{ d.nombre }}" data-objetos="{{ d.objetos }}" data-tipo="{{ d.tipo }}">{{ d.nombre }} ({{ d.mb }} MB){% if d.tipo %} · {{ d.tipo }}{% endif %}</option>{% endfor %}
+    </select></div>
+  <div class="col-md-2"><label class="form-label">Modo</label>
+    <select name="modo" id="modo" class="form-select"><option>SCHEMA</option><option>TABLE</option><option>FULL</option></select></div>
+  <div class="col-md-2"><label class="form-label">Si la tabla existe</label>
+    <select name="accion" class="form-select"><option>SKIP</option><option>APPEND</option><option>TRUNCATE</option><option>REPLACE</option></select></div>
+  <div class="col-md-2"><label class="form-label">Contenido</label>
+    <select name="contenido" class="form-select"><option value="ALL">Todo</option><option value="METADATA_ONLY">Estructura</option><option value="DATA_ONLY">Datos</option></select></div>
+
+  <div class="col-md-6" id="bEsquemas"><label class="form-label">Esquema(s) a restaurar (separados por coma)</label><input name="esquemas" id="esquemas" class="form-control"></div>
+  <div class="col-md-6 d-none" id="bTablas"><label class="form-label">Tabla(s) ESQUEMA.TABLA (separadas por coma)</label><input name="tablas" id="tablas" class="form-control"></div>
+  <div class="col-md-3" id="bRemap1"><label class="form-label">Remap: esquema origen</label><input name="remap_origen" class="form-control" placeholder="opcional"></div>
+  <div class="col-md-3" id="bRemap2"><label class="form-label">Remap: esquema destino</label><input name="remap_destino" class="form-control" placeholder="opcional"></div>
+  <div class="col-md-4 d-none" id="bFull"><label class="form-label">Escriba FULL para confirmar</label><input name="confirmar" class="form-control"></div>
+  <div class="col-12"><div class="form-text">El esquema destino de un remap se crea automáticamente al importar como SYS. Con SKIP no se sobrescriben tablas existentes.</div></div>
+  <div class="col-12"><button class="btn btn-warning" {{ 'disabled' if not ruta }}>Iniciar recuperación</button></div>
+</form></div></div>
+
+<div class="card"><div class="card-header">Historial de recuperaciones {% if en_curso %}<span class="spinner-border spinner-border-sm"></span>{% endif %}</div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 small align-middle">
+  <thead><tr><th>#</th><th>Modo</th><th>Objetos</th><th>Archivo</th><th>Estado</th><th>Inicio</th><th>Seg</th><th></th></tr></thead>
+  <tbody>{% for h in historial %}<tr>
+    <td>{{ h.ID }}</td><td>{{ h.TIPO }}</td><td>{{ h.OBJETOS }}</td><td>{{ h.ARCHIVO }}</td>
+    <td><span class="badge {{ 'bg-success' if h.ESTADO=='OK' else 'bg-warning text-dark' if h.ESTADO=='ADVERTENCIA' else 'bg-primary' if h.ESTADO=='EN CURSO' else 'bg-danger' }}">{{ h.ESTADO }}</span></td>
+    <td>{{ h.INICIO }}</td><td>{{ h.SEGUNDOS | int }}</td>
+    <td><a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('respaldos.log', registro=h.ID) }}">Ver log</a></td>
+  </tr>{% if h.ESTADO == 'ERROR' and h.MENSAJE %}<tr><td></td><td colspan="7" class="text-danger"><pre class="mb-0 small">{{ h.MENSAJE }}</pre></td></tr>{% endif %}
+  {% else %}<tr><td colspan="8" class="text-muted">Sin recuperaciones todavía.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<script>
+const modo = document.getElementById('modo'), archivo = document.getElementById('archivo');
+function ver(){
+  const m = modo.value;
+  document.getElementById('bEsquemas').classList.toggle('d-none', m !== 'SCHEMA');
+  document.getElementById('bTablas').classList.toggle('d-none', m !== 'TABLE');
+  document.getElementById('bFull').classList.toggle('d-none', m !== 'FULL');
+  ['bRemap1','bRemap2'].forEach(i => document.getElementById(i).classList.toggle('d-none', m === 'FULL'));
+}
+function sugerir(){
+  const o = archivo.selectedOptions[0];
+  if (!o || !o.dataset.objetos) return;
+  const t = o.dataset.tipo;
+  if (t === 'SCHEMA') { modo.value = 'SCHEMA'; document.getElementById('esquemas').value = o.dataset.objetos; }
+  else if (t === 'TABLE') { modo.value = 'TABLE'; document.getElementById('tablas').value = o.dataset.objetos; }
+  else if (t === 'FULL') { modo.value = 'FULL'; }
+  ver();
+}
+modo.addEventListener('change', ver); archivo.addEventListener('change', sugerir); ver();
+document.getElementById('form').addEventListener('submit', e => {
+  if (!confirm('¿Iniciar la recuperación? Puede modificar datos existentes.')) e.preventDefault();
+});
+</script>
+{% endblock %}

@@ -17,7 +17,10 @@ app.register_blueprint(usuarios_bp)
 from modules.respaldos import bp as respaldos_bp  # noqa: E402
 
 app.register_blueprint(auditoria_bp)
+from modules.recuperacion import bp as recuperacion_bp  # noqa: E402
+
 app.register_blueprint(respaldos_bp)
+app.register_blueprint(recuperacion_bp)
 
 MODULOS = [
     ("index", "Inicio"),
@@ -25,6 +28,7 @@ MODULOS = [
     ("usuarios.listar", "Seguridad de usuarios"),
     ("auditoria.politicas", "Auditoría"),
     ("respaldos.index", "Respaldos"),
+    ("recuperacion.index", "Recuperación"),
 ]
 
 
