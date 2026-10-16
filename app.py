@@ -6,8 +6,13 @@ from db import query_dicts
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 
+from modules.tablespaces import bp as tablespaces_bp  # noqa: E402
+
+app.register_blueprint(tablespaces_bp)
+
 MODULOS = [
     ("index", "Inicio"),
+    ("tablespaces.listar", "Tablespaces"),
 ]
 
 

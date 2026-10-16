@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Tablespaces{% endblock %}
+{% block content %}
+<h2>Administración de tablespaces</h2>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="card mb-4"><div class="card-header">Tablespaces</div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
+  <thead><tr><th>Nombre</th><th>Estado</th><th>Tipo</th><th>Total MB</th><th>Usado MB</th><th>Libre MB</th><th style="width:18%">% usado</th><th>Acciones</th></tr></thead>
+  <tbody>
+  {% for t in tablespaces %}
+  <tr>
+    <td><b>{{ t.TABLESPACE_NAME }}</b></td><td>{{ t.STATUS }}</td><td>{{ t.CONTENTS }}</td>
+    <td>{{ t.TOTAL_MB }}</td><td>{{ t.USED_MB }}</td><td>{{ t.FREE_MB }}</td>
+    <td>{% if t.PCT_USED is not none %}
+      <div class="progress"><div class="progress-bar {{ 'bg-danger' if t.PCT_USED > 85 else 'bg-warning' if t.PCT_USED > 70 else 'bg-success' }}" style="width:{{ t.PCT_USED }}%">{{ t.PCT_USED }}%</div></div>
+      {% else %}-{% endif %}</td>
+    <td class="text-nowrap">
+      {% if t.CONTENTS == 'PERMANENT' %}
+      <form method="post" action="{{ url_for('tablespaces.estado') }}" class="d-inline">
+        <input type="hidden" name="tablespace" value="{{ t.TABLESPACE_NAME }}">
+        {% if t.STATUS == 'ONLINE' %}
+        <button name="modo" value="offline" class="btn btn-sm btn-outline-secondary">Offline</button>
+        {% else %}
+        <button name="modo" value="online" class="btn btn-sm btn-outline-success">Online</button>
+        {% endif %}
+      </form>
+      <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#dropModal" data-ts="{{ t.TABLESPACE_NAME }}">Eliminar</button>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6"><div class="card"><div class="card-header">Crear tablespace</div><div class="card-body">
+    <form method="post" action="{{ url_for('tablespaces.crear') }}" class="row g-2">
+      <div class="col-6"><input name="nombre" class="form-control" placeholder="Nombre" required></div>
+      <div class="col-6"><input name="tamano" class="form-control" placeholder="Tamaño (100M, 1G)" required></div>
+      <div class="col-12"><input name="ruta" class="form-control" placeholder="Ruta del datafile (opcional)"></div>
+      <div class="col-12 form-check ms-2"><input type="checkbox" name="autoextend" class="form-check-input" id="ae" checked><label for="ae" class="form-check-label">Autoextend</label></div>
+      <div class="col-12"><button class="btn btn-primary">Crear</button></div>
+    </form></div></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header">Agregar datafile</div><div class="card-body">
+    <form method="post" action="{{ url_for('tablespaces.agregar_datafile') }}" class="row g-2">
+      <div class="col-6"><select name="tablespace" class="form-select">
+        {% for t in tablespaces if t.CONTENTS == 'PERMANENT' %}<option>{{ t.TABLESPACE_NAME }}</option>{% endfor %}</select></div>
+      <div class="col-6"><input name="tamano" class="form-control" placeholder="Tamaño (100M)" required></div>
+      <div class="col-12"><input name="ruta" class="form-control" placeholder="Ruta (opcional)"></div>
+      <div class="col-12"><button class="btn btn-primary">Agregar</button></div>
+    </form></div></div></div>
+</div>
+
+<div class="card"><div class="card-header">Datafiles</div>
+<div class="table-responsive"><table class="table table-sm mb-0 align-middle">
+  <thead><tr><th>Tablespace</th><th>Archivo</th><th>MB</th><th>Autoextend</th><th>Máx MB</th><th>Acciones</th></tr></thead>
+  <tbody>
+  {% for a in archivos %}
+  <tr>
+    <td>{{ a.TABLESPACE_NAME }}</td><td class="small">{{ a.FILE_NAME }}</td><td>{{ a.SIZE_MB }}</td>
+    <td>{{ a.AUTOEXTENSIBLE }}</td><td>{{ a.MAX_MB }}</td>
+    <td class="text-nowrap">
+      <form method="post" action="{{ url_for('tablespaces.redimensionar') }}" class="d-inline-flex gap-1">
+        <input type="hidden" name="archivo" value="{{ a.FILE_NAME }}">
+        <input name="tamano" class="form-control form-control-sm" style="width:80px" placeholder="500M" required>
+        <button class="btn btn-sm btn-outline-primary">Resize</button>
+      </form>
+      <form method="post" action="{{ url_for('tablespaces.autoextend') }}" class="d-inline">
+        <input type="hidden" name="archivo" value="{{ a.FILE_NAME }}">
+        <button name="modo" value="{{ 'off' if a.AUTOEXTENSIBLE == 'YES' else 'on' }}" class="btn btn-sm btn-outline-secondary">Autoextend {{ 'OFF' if a.AUTOEXTENSIBLE == 'YES' else 'ON' }}</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+<div class="modal fade" id="dropModal" tabindex="-1"><div class="modal-dialog"><form method="post" action="{{ url_for('tablespaces.eliminar') }}" class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Eliminar tablespace</h5></div>
+  <div class="modal-body">
+    <p>Se eliminará el tablespace, su contenido y sus datafiles. Escriba <b id="dropName"></b> para confirmar.</p>
+    <input type="hidden" name="tablespace" id="dropTs"><input name="confirmar" class="form-control" required>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-danger">Eliminar</button></div>
+</form></div></div>
+<script>
+document.getElementById('dropModal').addEventListener('show.bs.modal', e => {
+  const ts = e.relatedTarget.dataset.ts;
+  document.getElementById('dropName').textContent = ts;
+  document.getElementById('dropTs').value = ts;
+});
+</script>
+{% endblock %}
