@@ -1,0 +1,6 @@
+<h2>Tuning de consultas</h2>
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link {{ 'active' if tab == 'plan' }}" href="{{ url_for('tuning.plan') }}">Plan de ejecución</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if tab == 'est' }}" href="{{ url_for('tuning.estadisticas') }}">Estadísticas</a></li>
+  <li class="nav-item"><a class="nav-link {{ 'active' if tab == 'idx' }}" href="{{ url_for('tuning.indices') }}">Índices</a></li>
+</ul>

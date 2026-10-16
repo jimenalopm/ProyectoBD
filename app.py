@@ -26,7 +26,10 @@ app.register_blueprint(recuperacion_bp)
 from modules.performance import bp as performance_bp  # noqa: E402
 
 app.register_blueprint(archivos_bp)
+from modules.tuning import bp as tuning_bp  # noqa: E402
+
 app.register_blueprint(performance_bp)
+app.register_blueprint(tuning_bp)
 
 MODULOS = [
     ("index", "Inicio"),
@@ -37,6 +40,7 @@ MODULOS = [
     ("recuperacion.index", "Recuperación"),
     ("archivos.index", "Archivos de respaldo"),
     ("performance.index", "Performance"),
+    ("tuning.plan", "Tuning de consultas"),
 ]
 
 

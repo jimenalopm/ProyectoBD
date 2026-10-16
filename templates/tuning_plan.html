@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Tuning - Plan{% endblock %}
+{% block content %}
+{% set tab = 'plan' %}{% include "tuning_nav.html" %}
+{% if error %}<div class="alert alert-danger"><pre class="mb-0 small">{{ error }}</pre></div>{% endif %}
+
+<form method="post" class="mb-3">
+  <div class="row g-2 mb-2">
+    <div class="col-md-3"><select name="esquema" class="form-select"><option value="">Esquema actual (SYS)</option>{% for e in esquemas %}<option {{ 'selected' if e == esquema }}>{{ e }}</option>{% endfor %}</select></div>
+  </div>
+  <textarea name="sql" rows="6" class="form-control font-monospace" placeholder="SELECT ... (una sola sentencia)">{{ sql }}</textarea>
+  <div class="mt-2 d-flex gap-2">
+    <button name="accion" value="plan" class="btn btn-primary">Explicar plan</button>
+    <button name="accion" value="ejecutar" class="btn btn-outline-primary">Ejecutar y medir (solo SELECT)</button>
+  </div>
+</form>
+
+{% if plan %}
+<div class="row g-3">
+  <div class="{{ 'col-md-6' if anterior else 'col-12' }}"><div class="card"><div class="card-header">Plan actual {% if costo is not none %}<span class="badge bg-primary">Costo {{ costo }}</span>{% endif %}</div>
+    <div class="card-body"><pre class="mb-0 small">{{ plan }}</pre></div></div></div>
+  {% if anterior %}
+  <div class="col-md-6"><div class="card"><div class="card-header">Plan anterior ({{ anterior.hora }}) {% if anterior.costo is not none %}<span class="badge bg-secondary">Costo {{ anterior.costo }}</span>{% endif %}
+    {% if anterior.costo is not none and costo is not none %}{% if costo < anterior.costo %}<span class="badge bg-success">Mejoró</span>{% elif costo > anterior.costo %}<span class="badge bg-danger">Empeoró</span>{% else %}<span class="badge bg-light text-dark">Igual</span>{% endif %}{% endif %}</div>
+    <div class="card-body"><pre class="mb-0 small">{{ anterior.plan }}</pre></div></div></div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if ejecucion %}
+<div class="card mt-3"><div class="card-header">Ejecución: {{ ejecucion.total }} fila(s) (máx. 1000) en <b>{{ ejecucion.ms }} ms</b></div>
+  <div class="table-responsive" style="max-height:260px"><table class="table table-sm small mb-0">
+    <thead><tr>{% for c in ejecucion.cols %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for f in ejecucion.filas %}<tr>{% for v in f %}<td>{{ v if v is not none else '' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  <div class="card-body border-top"><div class="small text-muted">Plan real (ALLSTATS LAST)</div><pre class="mb-0 small">{{ ejecucion.plan_real }}</pre></div></div>
+{% endif %}
+<p class="text-muted small mt-3">Para comparar antes/después: explique el plan, cree un índice o recolecte estadísticas en las otras pestañas y vuelva a explicar la misma sentencia.</p>
+{% endblock %}

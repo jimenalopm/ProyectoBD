@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Tuning - Estadísticas{% endblock %}
+{% block content %}
+{% set tab = 'est' %}{% include "tuning_nav.html" %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<form method="get" class="d-flex gap-2 mb-3">
+  <select name="esquema" class="form-select w-auto" onchange="this.form.submit()"><option value="">-- esquema --</option>{% for e in esquemas %}<option {{ 'selected' if e == esquema }}>{{ e }}</option>{% endfor %}</select>
+</form>
+{% if esquema %}
+<form method="post" action="{{ url_for('tuning.estadisticas_accion') }}" class="mb-3" onsubmit="return confirm('¿Recolectar estadísticas de todo el esquema?')">
+  <input type="hidden" name="esquema" value="{{ esquema }}"><button name="accion" value="esquema" class="btn btn-primary">Recolectar estadísticas del esquema {{ esquema }}</button></form>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small align-middle">
+  <thead><tr><th>Tabla</th><th>Filas</th><th>Bloques</th><th>Long. prom. fila</th><th>Último análisis</th><th>Obsoletas</th><th></th></tr></thead>
+  <tbody>{% for t in tablas %}<tr>
+    <td>{{ t.TABLE_NAME }}</td><td>{{ t.NUM_ROWS if t.NUM_ROWS is not none else '' }}</td><td>{{ t.BLOCKS if t.BLOCKS is not none else '' }}</td><td>{{ t.AVG_ROW_LEN if t.AVG_ROW_LEN is not none else '' }}</td>
+    <td>{{ t.ANALIZADA or 'Sin estadísticas' }}</td>
+    <td>{% if t.STALE_STATS == 'YES' %}<span class="badge bg-warning text-dark">Sí</span>{% elif t.STALE_STATS == 'NO' %}<span class="badge bg-success">No</span>{% endif %}</td>
+    <td class="text-nowrap"><form method="post" action="{{ url_for('tuning.estadisticas_accion') }}" class="d-inline">
+      <input type="hidden" name="esquema" value="{{ esquema }}"><input type="hidden" name="tabla" value="{{ t.TABLE_NAME }}">
+      <button name="accion" value="tabla" class="btn btn-sm btn-outline-primary">Recolectar</button>
+      <button name="accion" value="borrar" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Borrar estadísticas de {{ t.TABLE_NAME }}?')">Borrar</button></form></td>
+  </tr>{% else %}<tr><td colspan="7" class="text-muted">Sin tablas.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}
+{% endblock %}
