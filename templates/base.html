@@ -12,8 +12,8 @@
     <nav class="col-md-2 bg-dark text-white min-vh-100 p-3">
       <h5 class="mb-4">Admin Oracle 21c XE</h5>
       <ul class="nav flex-column">
-        {% for endpoint, nombre in modulos %}
-        <li class="nav-item"><a class="nav-link text-white" href="{{ url_for(endpoint) }}">{{ nombre }}</a></li>
+        {% for endpoint, nombre, prefijo in modulos %}
+        <li class="nav-item"><a class="nav-link text-white rounded {{ 'bg-primary' if (prefijo and prefijo == actual) or (not prefijo and actual == 'index') }}" href="{{ url_for(endpoint) }}">{{ nombre }}</a></li>
         {% endfor %}
       </ul>
     </nav>

@@ -1,52 +1,46 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 import config
 from db import query_dicts
+from modules import (archivos, auditoria, performance, recuperacion, respaldos,
+                     tablespaces, tuning, usuarios)
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 
-from modules.tablespaces import bp as tablespaces_bp  # noqa: E402
+for modulo in (tablespaces, usuarios, auditoria, respaldos, recuperacion,
+               archivos, performance, tuning):
+    app.register_blueprint(modulo.bp)
 
-from modules.usuarios import bp as usuarios_bp  # noqa: E402
-
-app.register_blueprint(tablespaces_bp)
-from modules.auditoria import bp as auditoria_bp  # noqa: E402
-
-app.register_blueprint(usuarios_bp)
-from modules.respaldos import bp as respaldos_bp  # noqa: E402
-
-app.register_blueprint(auditoria_bp)
-from modules.recuperacion import bp as recuperacion_bp  # noqa: E402
-
-app.register_blueprint(respaldos_bp)
-from modules.archivos import bp as archivos_bp  # noqa: E402
-
-app.register_blueprint(recuperacion_bp)
-from modules.performance import bp as performance_bp  # noqa: E402
-
-app.register_blueprint(archivos_bp)
-from modules.tuning import bp as tuning_bp  # noqa: E402
-
-app.register_blueprint(performance_bp)
-app.register_blueprint(tuning_bp)
-
+# (endpoint, nombre, prefijo de blueprint para marcar el menú activo)
 MODULOS = [
-    ("index", "Inicio"),
-    ("tablespaces.listar", "Tablespaces"),
-    ("usuarios.listar", "Seguridad de usuarios"),
-    ("auditoria.politicas", "Auditoría"),
-    ("respaldos.index", "Respaldos"),
-    ("recuperacion.index", "Recuperación"),
-    ("archivos.index", "Archivos de respaldo"),
-    ("performance.index", "Performance"),
-    ("tuning.plan", "Tuning de consultas"),
+    ("index", "Inicio", None),
+    ("tablespaces.listar", "Tablespaces", "tablespaces"),
+    ("usuarios.listar", "Seguridad de usuarios", "usuarios"),
+    ("auditoria.politicas", "Auditoría", "auditoria"),
+    ("respaldos.index", "Respaldos", "respaldos"),
+    ("recuperacion.index", "Recuperación", "recuperacion"),
+    ("archivos.index", "Archivos de respaldo", "archivos"),
+    ("performance.index", "Performance", "performance"),
+    ("tuning.plan", "Tuning de consultas", "tuning"),
 ]
 
 
 @app.context_processor
 def inject_menu():
-    return {"modulos": MODULOS}
+    actual = (request.endpoint or "").split(".")[0]
+    return {"modulos": MODULOS, "actual": actual}
+
+
+@app.errorhandler(404)
+def no_encontrado(_e):
+    return render_template("error.html", titulo="Página no encontrada", detalle=request.path), 404
+
+
+@app.errorhandler(Exception)
+def error_general(e):
+    code = getattr(e, "code", 500)
+    return render_template("error.html", titulo="Ocurrió un error", detalle=str(e)), code
 
 
 @app.route("/")

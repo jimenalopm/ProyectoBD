@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }}{% endblock %}
+{% block content %}
+<h2>{{ titulo }}</h2>
+<div class="alert alert-danger"><pre class="mb-0 small">{{ detalle }}</pre></div>
+<a class="btn btn-primary" href="{{ url_for('index') }}">Volver al inicio</a>
+{% endblock %}
