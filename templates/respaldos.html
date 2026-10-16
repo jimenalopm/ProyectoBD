@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Respaldos{% endblock %}
+{% block content %}
+{% if en_curso %}<meta http-equiv="refresh" content="5">{% endif %}
+<h2>Respaldos (Data Pump)</h2>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+<div class="card mb-3"><div class="card-header">Directorio de respaldos (BACKUP_DIR)</div><div class="card-body">
+  <form method="post" action="{{ url_for('respaldos.directorio') }}" class="row g-2">
+    <div class="col-md-9"><input name="ruta" class="form-control" value="{{ ruta or sugerida or '' }}" placeholder="Ruta donde Oracle escribirá los archivos .dmp" required>
+      <div class="form-text">{% if ruta %}Configurado. {% else %}Aún no configurado. {% endif %}El servicio Oracle debe tener permiso de escritura en la ruta; la sugerida es la de DATA_PUMP_DIR.</div></div>
+    <div class="col-md-3"><button class="btn btn-primary">{{ 'Actualizar' if ruta else 'Crear directorio' }}</button></div>
+  </form></div></div>
+
+<div class="card mb-4"><div class="card-header">Nuevo respaldo</div><div class="card-body">
+<form method="post" action="{{ url_for('respaldos.crear') }}" class="row g-3">
+  <div class="col-md-3"><label class="form-label">Tipo</label>
+    <select name="tipo" id="tipo" class="form-select">
+      <option value="SCHEMA">Por schema(s)</option><option value="TABLE">Por tabla(s)</option><option value="FULL">Full (toda la BD)</option></select></div>
+  <div class="col-md-3"><label class="form-label">Contenido</label>
+    <select name="contenido" class="form-select"><option value="ALL">Estructura y datos</option><option value="METADATA_ONLY">Solo estructura</option><option value="DATA_ONLY">Solo datos</option></select></div>
+  <div class="col-md-3" id="bloqueSchema"><label class="form-label">Schemas (Ctrl para varios)</label>
+    <select name="esquemas" multiple size="6" class="form-select">{% for e in esquemas %}<option>{{ e }}</option>{% endfor %}</select></div>
+  <div class="col-md-3 d-none" id="bloqueOwner"><label class="form-label">Esquema dueño</label>
+    <select name="owner" id="owner" class="form-select"><option value="">-- elegir --</option>{% for e in esquemas %}<option>{{ e }}</option>{% endfor %}</select></div>
+  <div class="col-md-3 d-none" id="bloqueTablas"><label class="form-label">Tablas</label>
+    <select name="tablas" id="tablas" multiple size="6" class="form-select"></select></div>
+  <div class="col-12"><button class="btn btn-primary" {{ 'disabled' if not ruta }}>Iniciar respaldo</button></div>
+</form></div></div>
+
+<div class="card"><div class="card-header d-flex justify-content-between">Historial {% if en_curso %}<span class="spinner-border spinner-border-sm"></span>{% endif %}</div>
+<div class="table-responsive"><table class="table table-sm table-hover mb-0 small align-middle">
+  <thead><tr><th>#</th><th>Operación</th><th>Tipo</th><th>Objetos</th><th>Archivo</th><th>Estado</th><th>Inicio</th><th>Seg</th><th>MB</th><th></th></tr></thead>
+  <tbody>{% for h in historial %}<tr>
+    <td>{{ h.ID }}</td><td>{{ h.OPERACION }}</td><td>{{ h.TIPO }}</td><td style="max-width:220px" class="text-truncate" title="{{ h.OBJETOS }}">{{ h.OBJETOS }}</td>
+    <td>{{ h.ARCHIVO }}</td>
+    <td><span class="badge {{ 'bg-success' if h.ESTADO=='OK' else 'bg-warning text-dark' if h.ESTADO=='ADVERTENCIA' else 'bg-primary' if h.ESTADO=='EN CURSO' else 'bg-danger' }}">{{ h.ESTADO }}</span></td>
+    <td>{{ h.INICIO }}</td><td>{{ h.SEGUNDOS | int }}</td><td>{{ h.TAMANO_MB or '' }}</td>
+    <td><a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('respaldos.log', registro=h.ID) }}">Ver log</a></td>
+  </tr>{% if h.ESTADO == 'ERROR' and h.MENSAJE %}<tr><td></td><td colspan="9" class="text-danger"><pre class="mb-0 small">{{ h.MENSAJE }}</pre></td></tr>{% endif %}
+  {% else %}<tr><td colspan="10" class="text-muted">Sin respaldos todavía.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<script>
+const tipo = document.getElementById('tipo');
+function actualizar(){
+  document.getElementById('bloqueSchema').classList.toggle('d-none', tipo.value !== 'SCHEMA');
+  document.getElementById('bloqueOwner').classList.toggle('d-none', tipo.value !== 'TABLE');
+  document.getElementById('bloqueTablas').classList.toggle('d-none', tipo.value !== 'TABLE');
+}
+tipo.addEventListener('change', actualizar); actualizar();
+document.getElementById('owner').addEventListener('change', async e => {
+  const sel = document.getElementById('tablas'); sel.innerHTML = '';
+  if (!e.target.value) return;
+  const r = await fetch('{{ url_for("respaldos.tablas") }}?owner=' + encodeURIComponent(e.target.value));
+  (await r.json()).forEach(t => sel.add(new Option(t, t)));
+});
+</script>
+{% endblock %}
