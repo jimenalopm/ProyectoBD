@@ -117,9 +117,11 @@ def _worker(registro, exe, params, directorio, archivo, logfile, es_export):
                               errors="replace", creationflags=0x08000000)
         salida = proc.stdout + proc.stderr
         log = _leer_log(os.path.join(directorio, logfile)) or salida
-        if "successfully completed" in log and proc.returncode == 0:
+        # El código de salida no depende del idioma de Oracle (el log puede salir en
+        # español): 0 = éxito, 5 = terminó con errores no fatales (EX_SUCC_ERR).
+        if proc.returncode == 0:
             estado = "OK"
-        elif "completed with" in log:
+        elif proc.returncode == 5:
             estado = "ADVERTENCIA"
         errores = re.findall(r"^(?:ORA|UDE|LRM)-\d+.*$", log + "\n" + salida, re.M)
         mensaje = "\n".join(errores[:8])[:2000]
