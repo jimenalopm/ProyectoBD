@@ -1,0 +1,588 @@
+==============================================================================
+ GUION DE DEFENSA - Admin Oracle 21c XE (EIF-402)
+ Notas para correr el proyecto y explicarlo en vivo
+==============================================================================
+
+COMO USAR ESTE ARCHIVO
+- Dejalo abierto en el Bloc de notas al lado de la pantalla.
+- Cada paso tiene 3 partes:
+    DECIR   -> lo que le explicas al profesor.
+    APP     -> lo que haces en el navegador (http://localhost:5000).
+    SQL     -> el comando que pegas en SQL*Plus para demostrar que es real.
+- Los bloques SQL se copian y pegan tal cual (clic derecho = pegar).
+
+
+==============================================================================
+ 0. ANTES DE LA DEFENSA (hacer 15 minutos antes)
+==============================================================================
+
+[ ] 0.1  Servicios de Oracle activos (Servicios de Windows):
+         OracleServiceXE  y  OracleOraDB21Home1TNSListener.
+
+[ ] 0.2  Tener aplicado el arreglo del estado de respaldos (si no, los
+         respaldos buenos salen en ERROR). En PowerShell, en la carpeta
+         del proyecto:
+
+            git fetch origin claude/jolly-gates-xag6y3
+            git checkout claude/jolly-gates-xag6y3
+
+[ ] 0.3  Iniciar la app (PowerShell, carpeta ProyectoBD):
+
+            python app.py
+
+         Abrir http://localhost:5000  -> debe verse el Panel de control
+         con graficas y SIN cuadro rojo.
+
+[ ] 0.4  Verificar que expdp funciona (otra PowerShell):
+
+            expdp -help
+
+[ ] 0.5  Abrir TRES ventanas de SQL*Plus y dejarlas listas:
+
+   VENTANA A  (administrador, la principal):
+            sqlplus / as sysdba
+            (si pide usuario: escribir  / as sysdba  y la contrasena de SYS)
+
+            ALTER SESSION SET CONTAINER = XEPDB1;
+            SET LINESIZE 200 PAGESIZE 100
+
+   VENTANA B  (usuario de prueba) -> se abre en el paso 2.
+   VENTANA C  (segundo usuario, solo para el bloqueo) -> se abre en el paso 7.
+
+[ ] 0.6  PREPARAR el escenario de TUNING (en Ventana A). Se hace antes
+         porque crear 200 000 filas toma unos segundos:
+
+   CREATE USER usr_tuning IDENTIFIED BY "Clave123" DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
+   GRANT CREATE SESSION, CREATE TABLE TO usr_tuning;
+   CREATE TABLE usr_tuning.ventas AS
+     SELECT level id, MOD(level,500) cliente, SYSDATE-MOD(level,365) fecha,
+            ROUND(DBMS_RANDOM.VALUE(1,1000),2) monto
+     FROM dual CONNECT BY level <= 200000;
+   SELECT COUNT(*) FROM usr_tuning.ventas;
+
+   (Debe dar 200000.)
+
+[ ] 0.7  Limpiar restos de pruebas anteriores (Ventana A). Si algun comando
+         dice "no existe", ignorarlo:
+
+   DROP USER usr_demo CASCADE;
+   DROP USER usr_copia CASCADE;
+
+   Y en la app: Auditoria -> eliminar la politica POL_DEMO si existe;
+   Archivos de respaldo -> borrar .dmp/.log viejos si quieres empezar limpia.
+
+[ ] 0.8  Poner el navegador en pantalla completa y el zoom en 100 %.
+
+
+==============================================================================
+ EXPLICACION GENERAL (decir al empezar, 30 segundos)
+==============================================================================
+
+DECIR:
+ "El proyecto es una aplicacion web hecha en Python con Flask que administra
+  una base de datos Oracle 21c Express. Se conecta como SYSDBA con la libreria
+  oracledb y ejecuta las mismas sentencias SQL que un DBA haria a mano, pero
+  con una interfaz. Para respaldos usa Data Pump (expdp/impdp). Tiene 8
+  modulos: tablespaces, seguridad de usuarios, auditoria, respaldos,
+  recuperacion, archivos de respaldo, performance y tuning. En cada uno voy a
+  hacer la accion en la app y la voy a comprobar en SQL*Plus para demostrar
+  que es real."
+
+ESTRUCTURA (si la pregunta):
+ - app.py            -> menu y pantalla de inicio
+ - db.py             -> conexion a Oracle
+ - modules/*.py      -> un archivo por modulo (la logica)
+ - modules/datapump.py -> ejecuta expdp/impdp en segundo plano
+ - templates/        -> pantallas HTML
+ - sql/              -> scripts de verificacion por modulo
+ - docs/             -> manual de usuario y guion
+
+
+==============================================================================
+ 1. INICIO (Panel de control)                                    ~1 min
+==============================================================================
+
+DECIR:
+ "Esta pantalla resume el estado de la instancia: nombre, version, estado,
+  modo de archivado, cantidad de tablespaces, usuarios y sesiones, y la
+  grafica muestra el espacio usado y libre de cada tablespace."
+
+APP:  Menu -> Inicio. Senalar instancia, version, estado OPEN y la grafica.
+
+SQL (Ventana A):
+
+   SELECT instance_name, status, version_full FROM v$instance;
+   SELECT COUNT(*) tablespaces FROM dba_tablespaces;
+
+ -> Los datos coinciden con la pantalla.
+
+
+==============================================================================
+ 2. TABLESPACES                                                  ~2 min
+==============================================================================
+
+DECIR:
+ "Un tablespace es el espacio logico donde Oracle guarda los datos; fisicamente
+  son archivos llamados datafiles. Este modulo permite controlar el espacio:
+  las barras cambian de color segun el uso (verde, amarillo sobre 70 %, rojo
+  sobre 85 %), y se pueden crear, agrandar, poner en linea o fuera de linea y
+  eliminar."
+
+APP:  Menu -> Tablespaces.
+  1) Mostrar la tabla y las barras de porcentaje.
+  2) Crear tablespace: nombre TS_DEMO, tamano 50M, autoextend activado.
+  3) En TS_DEMO: Agregar datafile, luego Resize, luego Autoextend OFF.
+  4) Poner TS_DEMO en Offline y de nuevo en Online.
+
+SQL (Ventana A) - despues de crearlo:
+
+   SELECT tablespace_name, status FROM dba_tablespaces WHERE tablespace_name='TS_DEMO';
+   COL file_name FORMAT A70
+   SELECT file_name, bytes/1048576 mb, autoextensible FROM dba_data_files WHERE tablespace_name='TS_DEMO';
+
+ -> Se ven los datafiles, su tamano y si tienen autoextend.
+
+APP:  Eliminar TS_DEMO (pide escribir el nombre: es una confirmacion para
+      que no se borre por error; los tablespaces del sistema estan protegidos).
+
+SQL (Ventana A) - comprobar que ya no existe:
+
+   SELECT tablespace_name FROM dba_tablespaces WHERE tablespace_name='TS_DEMO';
+
+ -> "ninguna fila seleccionada".
+
+
+==============================================================================
+ 3. SEGURIDAD DE USUARIOS                                        ~3 min
+==============================================================================
+
+DECIR:
+ "Este modulo controla quien entra a la base y que puede hacer: usuarios,
+  perfiles y sesiones. Un perfil define limites como intentos fallidos de
+  login o la vida de la contrasena."
+
+APP:  Menu -> Seguridad de usuarios.
+  1) Crear usuario: USR_DEMO, contrasena Clave123, tablespace USERS,
+     cuota 50M, marcar CREATE SESSION.
+  2) Clic en el nombre USR_DEMO: mostrar roles, privilegios y cuotas.
+  3) Otorgar el privilegio CREATE TABLE.
+
+SQL (Ventana A):
+
+   SELECT username, account_status, default_tablespace, profile FROM dba_users WHERE username='USR_DEMO';
+   SELECT privilege FROM dba_sys_privs WHERE grantee='USR_DEMO';
+   SELECT tablespace_name, max_bytes FROM dba_ts_quotas WHERE username='USR_DEMO';
+
+PROBAR EL LOGIN REAL - abrir VENTANA B (otra SQL*Plus):
+
+   Usuario:     usr_demo@localhost:1521/XEPDB1
+   Contrasena:  Clave123
+
+   (o dentro de SQL*Plus:  CONNECT usr_demo/Clave123@localhost:1521/XEPDB1 )
+
+   CREATE TABLE t1 (id NUMBER, c VARCHAR2(20));
+   INSERT INTO t1 SELECT level, 'dato'||level FROM dual CONNECT BY level <= 100;
+   COMMIT;
+   SELECT COUNT(*) FROM t1;
+
+ -> Da 100. Esta tabla se usa en respaldos, recuperacion y bloqueos.
+
+APP:  Bloquear a USR_DEMO.
+SQL (Ventana B, intentar entrar de nuevo):
+
+   CONNECT usr_demo/Clave123@localhost:1521/XEPDB1
+
+ -> Falla con ORA-28000 (cuenta bloqueada). Demuestra que el bloqueo es real.
+
+APP:  Desbloquear a USR_DEMO y volver a conectarse en Ventana B (ya entra).
+
+APP:  Pestana Perfiles: mostrar los perfiles y modificar un limite
+      (por ejemplo FAILED_LOGIN_ATTEMPTS).
+SQL (Ventana A):
+
+   SELECT profile, resource_name, limit FROM dba_profiles
+   WHERE resource_name IN ('FAILED_LOGIN_ATTEMPTS','PASSWORD_LIFE_TIME','SESSIONS_PER_USER') ORDER BY 1,2;
+
+APP:  Pestana Sesiones: mostrar la sesion de USR_DEMO (Ventana B) y el boton
+      para terminarla.
+SQL (Ventana A):
+
+   SELECT sid, serial#, username, status FROM v$session WHERE type='USER' AND username IS NOT NULL;
+
+
+==============================================================================
+ 4. AUDITORIA                                                    ~2 min
+==============================================================================
+
+DECIR:
+ "La auditoria deja registro de quien hizo que y cuando. Uso auditoria
+  unificada de Oracle 21c: se crea una politica con las acciones a vigilar,
+  se habilita para un usuario, y los eventos quedan en UNIFIED_AUDIT_TRAIL."
+
+APP:  Menu -> Auditoria -> Politicas.
+  1) Crear politica POL_DEMO con las acciones LOGON y CREATE TABLE.
+  2) Habilitarla para el usuario USR_DEMO.
+
+SQL (Ventana A):
+
+   SELECT policy_name, enabled_option, entity_name FROM audit_unified_enabled_policies ORDER BY 1;
+
+GENERAR EVENTOS (Ventana B, reconectarse y crear otra tabla):
+
+   CONNECT usr_demo/Clave123@localhost:1521/XEPDB1
+   CREATE TABLE t2 (id NUMBER);
+
+SQL (Ventana A) - el trail se escribe en cola, forzar que se vea ya:
+
+   EXEC DBMS_AUDIT_MGMT.FLUSH_UNIFIED_AUDIT_TRAIL;
+   COL dbusername FORMAT A15
+   COL action_name FORMAT A20
+   COL object_name FORMAT A20
+   SELECT TO_CHAR(event_timestamp,'HH24:MI:SS') hora, dbusername, action_name, object_name
+   FROM unified_audit_trail WHERE dbusername='USR_DEMO'
+   ORDER BY event_timestamp DESC FETCH FIRST 10 ROWS ONLY;
+
+APP:  Auditoria -> Registros: filtrar por usuario USR_DEMO. Se ven el LOGON y
+      el CREATE TABLE. Mostrar tambien los filtros (accion, fechas, resultado).
+      Mostrar que la politica se puede deshabilitar/habilitar.
+
+
+==============================================================================
+ 5. RESPALDOS (Data Pump)                                        ~3 min
+==============================================================================
+
+DECIR:
+ "Los respaldos usan Data Pump: la app arma el comando expdp y lo ejecuta en
+  segundo plano, asi la pantalla no se congela. Se puede respaldar por schema,
+  por tabla o la base completa, y cada operacion queda registrada en el
+  historial con su estado, duracion, tamano y log."
+
+TIP: lanzar el respaldo FULL primero, porque tarda mas, y explicar mientras corre.
+
+APP:  Menu -> Respaldos.
+  1) Directorio de respaldos: dejar la ruta por defecto y pulsar el boton
+     (crea el DIRECTORY de Oracle llamado BACKUP_DIR).
+  2) Respaldo FULL (toda la base).
+  3) Respaldo por SCHEMA: USR_DEMO.
+  4) Respaldo por TABLA: esquema USR_DEMO, tabla T1.
+  5) Mostrar el historial: se actualiza solo. Estado OK en verde, duracion y
+     tamano. Boton "Ver log" abre el log de Data Pump.
+  (Tambien se puede exportar solo estructura o solo datos.)
+
+SQL (Ventana A):
+
+   COL directory_path FORMAT A70
+   SELECT directory_name, directory_path FROM dba_directories WHERE directory_name='BACKUP_DIR';
+   COL archivo FORMAT A45
+   SELECT id, tipo, archivo, estado, tamano_mb FROM system.bkp_historial ORDER BY id DESC;
+
+COMPROBAR EN EL DISCO:
+   Copiar la ruta que mostro la primera consulta y abrirla en el Explorador
+   de Windows: se ven los archivos .dmp y .log creados.
+
+SI HAY UN TRABAJO EN CURSO (opcional):
+
+   SELECT owner_name, job_name, operation, state FROM dba_datapump_jobs;
+
+
+==============================================================================
+ 6. RECUPERACION (impdp)                                         ~3 min
+==============================================================================
+
+DECIR:
+ "La recuperacion restaura datos desde un .dmp con impdp. Simulo un desastre:
+  borro una tabla, la recupero desde el respaldo y compruebo los datos. Tambien
+  muestro el remap, que restaura el schema bajo otro nombre de usuario."
+
+--- 6A. Recuperar una tabla borrada ---
+
+SQL (Ventana A) - simular el desastre:
+
+   DROP TABLE usr_demo.t1;
+   SELECT COUNT(*) FROM usr_demo.t1;
+
+ -> Da error ORA-00942 (la tabla ya no existe).
+
+APP:  Menu -> Recuperacion.
+   Archivo de respaldo : el TABLE_USR_DEMO_... MAS RECIENTE (fecha/hora mayor)
+   Modo                : TABLE
+   Si la tabla existe  : SKIP
+   Contenido           : Todo
+   Tabla(s)            : USR_DEMO.T1      (siempre ESQUEMA.TABLA)
+   Remap               : vacio
+   -> Iniciar recuperacion. Esperar el estado OK en el historial.
+
+SQL (Ventana A) - validar:
+
+   SELECT COUNT(*) FROM usr_demo.t1;
+
+ -> Da 100. Los datos volvieron.
+
+--- 6B. Restaurar con remap a otro usuario ---
+
+APP:  Recuperacion.
+   Archivo de respaldo : SCHEMA_USR_DEMO_...
+   Modo                : SCHEMA
+   Si la tabla existe  : SKIP
+   Esquema(s)          : USR_DEMO
+   Remap origen        : USR_DEMO
+   Remap destino       : USR_COPIA
+   -> Iniciar recuperacion. (El usuario USR_COPIA se crea solo.)
+
+SQL (Ventana A):
+
+   SELECT owner, table_name FROM dba_tables WHERE owner='USR_COPIA';
+   SELECT COUNT(*) FROM usr_copia.t1;
+
+ -> Aparece T1 con 100 filas bajo el nuevo usuario.
+
+--- Sobre FULL (solo mostrar, NO ejecutar) ---
+ "El modo FULL restaura toda la base, por eso la app obliga a escribir la
+  palabra FULL para confirmar."
+
+SQL (Ventana A) - historial de recuperaciones:
+
+   SELECT id, tipo, objetos, archivo, estado FROM system.bkp_historial WHERE operacion='IMPORT' ORDER BY id DESC;
+
+APP:  Mostrar tambien el historial de recuperaciones y su log ("Ver log").
+
+
+==============================================================================
+ 7. ARCHIVOS DE RESPALDO                                         ~1-2 min
+==============================================================================
+
+DECIR:
+ "Este modulo administra los .dmp y .log en el disco: se pueden descargar,
+  renombrar y eliminar, y hay una politica de retencion para limpiar los
+  respaldos antiguos. Tambien administra los directorios de Oracle."
+
+APP:  Menu -> Archivos de respaldo.
+  1) Mostrar la lista (tamano, fecha, antiguedad) y el espacio en disco.
+  2) Descargar un .log y abrirlo.
+  3) Renombrar un archivo y mostrarlo en el Explorador de Windows.
+  4) Politica de retencion: escribir un numero de dias; los archivos que se
+     veran afectados salen resaltados. (Mostrarlo; eliminar solo si quieres.)
+  5) Directorios Oracle: crear DIR_DEMO con una carpeta que YA exista
+     (por ejemplo C:\Users\Jimen\Desktop). Luego eliminarlo.
+
+SQL (Ventana A):
+
+   COL directory_name FORMAT A25
+   COL directory_path FORMAT A70
+   SELECT directory_name, directory_path FROM dba_directories ORDER BY 1;
+
+ -> DIR_DEMO aparece al crearlo y desaparece al eliminarlo.
+
+
+==============================================================================
+ 8. PERFORMANCE                                                  ~2 min
+==============================================================================
+
+DECIR:
+ "Este panel permite ver como esta trabajando la base en tiempo real: sesiones,
+  metricas, ratios de cache, memoria SGA/PGA, esperas principales, las 10
+  consultas que mas consumen y los bloqueos entre sesiones."
+
+APP:  Menu -> Performance.
+  1) Recorrer: sesiones, metricas, ratios, memoria, esperas.
+  2) Top 10 SQL: cambiar el orden (tiempo, CPU, lecturas, ejecuciones).
+  3) Activar "Actualizar cada 10 s" para monitoreo continuo.
+
+SQL (Ventana A) - comparar con la pantalla:
+
+   SELECT COUNT(*) total, SUM(CASE WHEN status='ACTIVE' THEN 1 ELSE 0 END) activas
+   FROM v$session WHERE type='USER';
+
+   SELECT sql_id, parsing_schema_name, executions, ROUND(elapsed_time/1000,1) elapsed_ms,
+          SUBSTR(sql_text,1,50) sql_text
+   FROM v$sql WHERE executions > 0 ORDER BY elapsed_time DESC FETCH FIRST 5 ROWS ONLY;
+
+--- DEMOSTRAR UN BLOQUEO (dos sesiones) ---
+
+ VENTANA B (ya conectada como USR_DEMO):
+
+   CONNECT usr_demo/Clave123@localhost:1521/XEPDB1
+   UPDATE t1 SET c='bloqueo' WHERE id=1;
+
+   (NO hacer COMMIT. Dejarla asi.)
+
+ VENTANA C (nueva SQL*Plus, tambien USR_DEMO):
+
+   CONNECT usr_demo/Clave123@localhost:1521/XEPDB1
+   UPDATE t1 SET c='espera' WHERE id=1;
+
+   (Se queda "colgada" esperando. Eso es el bloqueo.)
+
+APP:  Performance -> seccion "Bloqueos": aparece la sesion bloqueada y quien
+      la bloquea.
+
+SQL (Ventana A):
+
+   SELECT sid, blocking_session, event, seconds_in_wait FROM v$session WHERE blocking_session IS NOT NULL;
+
+LIBERAR EL BLOQUEO (muy importante):
+ VENTANA B:   ROLLBACK;
+ VENTANA C:   ROLLBACK;     (la Ventana C termina su UPDATE al liberarse)
+
+
+==============================================================================
+ 9. TUNING DE CONSULTAS                                          ~3 min
+==============================================================================
+
+DECIR:
+ "El tuning busca que las consultas lentas sean rapidas. Oracle decide como
+  buscar los datos con un plan de ejecucion. Voy a explicar una consulta sobre
+  una tabla de 200 000 filas: sin indice hace un FULL SCAN, o sea, lee toda la
+  tabla; despues creo un indice y el plan pasa a INDEX RANGE SCAN con un costo
+  mucho menor."
+
+APP:  Menu -> Tuning de consultas.
+
+--- 9.1 Plan SIN indice ---
+   Esquema  : USR_TUNING
+   Sentencia: SELECT * FROM ventas WHERE cliente = 42
+   -> Pulsar "Explicar plan" (no ejecuta la consulta, solo muestra el plan).
+   Resultado esperado: TABLE ACCESS FULL. ANOTAR EL COSTO.
+
+SQL (Ventana A) - mismo plan por SQL*Plus:
+
+   EXPLAIN PLAN FOR SELECT * FROM usr_tuning.ventas WHERE cliente = 42;
+   SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+--- 9.2 Crear el indice ---
+APP:  Pestana Indices -> Crear:
+   Tabla: VENTAS     Columna: CLIENTE     Nombre: IDX_VENTAS_CLIENTE
+   (tipo normal, no UNIQUE)
+
+SQL (Ventana A):
+
+   SELECT index_name, table_name, uniqueness, status FROM dba_indexes WHERE owner='USR_TUNING';
+
+--- 9.3 Plan CON indice ---
+APP:  Volver a "Plan de ejecucion" y explicar la MISMA sentencia.
+   Resultado esperado: INDEX RANGE SCAN y costo MENOR. La app muestra la
+   comparacion con el plan anterior ("el costo mejoro").
+   Tambien probar "Ejecutar y medir" para ver el tiempo real.
+
+SQL (Ventana A):
+
+   EXPLAIN PLAN FOR SELECT * FROM usr_tuning.ventas WHERE cliente = 42;
+   SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+--- 9.4 Estadisticas ---
+DECIR:
+ "Las estadisticas son los datos (filas, bloques) que Oracle usa para elegir
+  el mejor plan. Si estan obsoletas, el optimizador puede elegir mal."
+
+APP:  Pestana Estadisticas -> esquema USR_TUNING: ver filas, bloques, ultimo
+      analisis y si estan obsoletas. Pulsar "Recolectar" (tabla o esquema).
+
+SQL (Ventana A):
+
+   SELECT table_name, num_rows, blocks, TO_CHAR(last_analyzed,'HH24:MI:SS') analizada
+   FROM dba_tables WHERE owner='USR_TUNING';
+
+ -> num_rows = 200000 y la hora de ultimo analisis se actualiza.
+    (Si ya decia 200000 antes de recolectar, es normal: Oracle recolecta
+     estadisticas solo al crear la tabla; lo que cambia es la hora.)
+
+--- 9.5 Indices: reconstruir y uso ---
+APP:  Pestana Indices: mostrar columnas, estado y uso; probar "Reconstruir".
+
+SQL (Ventana A):
+
+   SELECT index_name, column_name, column_position FROM dba_ind_columns WHERE index_owner='USR_TUNING' ORDER BY 1,3;
+
+
+==============================================================================
+ 10. LIMPIEZA AL TERMINAR
+==============================================================================
+
+SQL (Ventana A):
+
+   DROP USER usr_demo CASCADE;
+   DROP USER usr_copia CASCADE;
+   DROP USER usr_tuning CASCADE;
+
+APP:  Auditoria -> eliminar la politica POL_DEMO.
+APP:  Archivos de respaldo -> eliminar los archivos de prueba (opcional).
+
+
+==============================================================================
+ SI ALGO FALLA EN VIVO (calma, ya esta previsto)
+==============================================================================
+
+* Cuadro rojo ORA-01017 en el Inicio
+    -> contrasena mal en el archivo .env. Corregir, Ctrl+C en la terminal y
+       volver a correr  python app.py.
+
+* Un respaldo sale en ERROR
+    -> abrir "Ver log" y leer el mensaje. Verificar que expdp funciona
+       (expdp -help) y que existe el directorio BACKUP_DIR.
+    -> Si el log dice "terminado correctamente" pero el estado es ERROR,
+       falta aplicar el arreglo del paso 0.2.
+
+* "Archivo de respaldo invalido" en Recuperacion
+    -> elegir un archivo de la lista del selector; los nombres cambian con
+       cada respaldo nuevo (fecha y hora).
+
+* La recuperacion por tabla termina "OK" pero no cambia nada
+    -> la tabla ya existia y la opcion era SKIP. Borrar la tabla antes
+       (DROP TABLE usr_demo.t1;) o elegir REPLACE.
+
+* El UPDATE de la Ventana C no se queda esperando
+    -> la Ventana B hizo COMMIT o no ejecuto el UPDATE. Repetir el paso.
+
+* Los registros de auditoria no aparecen
+    -> ejecutar  EXEC DBMS_AUDIT_MGMT.FLUSH_UNIFIED_AUDIT_TRAIL;  y
+       refrescar la pantalla. Revisar que la politica este habilitada
+       para USR_DEMO y que te reconectaste DESPUES de habilitarla.
+
+* Un error raro de la app
+    -> la app muestra una pantalla de error con el mensaje de Oracle; no es
+       un cierre. Leerlo, explicarlo y volver con el menu.
+
+
+==============================================================================
+ PREGUNTAS PROBABLES DEL PROFESOR (respuestas cortas)
+==============================================================================
+
+- Por que conecta como SYSDBA?
+  Porque administra tablespaces, usuarios, auditoria y Data Pump; se usa
+  solo en un entorno de laboratorio.
+
+- Por que los respaldos corren en segundo plano?
+  Para que la interfaz no se bloquee; un hilo ejecuta expdp/impdp y al
+  terminar actualiza el historial (SYSTEM.BKP_HISTORIAL).
+
+- Como sabe la app si un respaldo salio bien?
+  Por el codigo de salida de expdp/impdp: 0 = OK, 5 = con advertencias,
+  otro = ERROR; y muestra el log completo.
+
+- Que es un DIRECTORY de Oracle?
+  Un objeto que apunta a una carpeta del servidor; Data Pump solo escribe
+  ahi (aqui BACKUP_DIR).
+
+- Que diferencia hay entre respaldo por schema, tabla y full?
+  Schema = todos los objetos de un usuario; tabla = solo esas tablas;
+  full = toda la base de datos.
+
+- Que hace el remap?
+  Restaura los objetos de un usuario bajo otro nombre (USR_DEMO -> USR_COPIA),
+  sin tocar el original.
+
+- Por que sirve un indice?
+  Evita leer toda la tabla (FULL SCAN): Oracle va directo a las filas que
+  coinciden (INDEX RANGE SCAN), con menor costo.
+
+- Que es la auditoria unificada?
+  Un sistema unico de Oracle donde las politicas definen que acciones se
+  registran y todo queda en UNIFIED_AUDIT_TRAIL.
+
+- Como evita la app borrar cosas por error?
+  Pide confirmaciones escribiendo el nombre (tablespace), LIMPIAR (auditoria)
+  o FULL (recuperacion total), y protege los objetos del sistema.
+
+==============================================================================
+ Exito en la defensa.
+==============================================================================
